@@ -1,0 +1,437 @@
+---
+title: "Projet MASTER I de SID"
+author: "Ibou Ka || Bocar Sow"
+date: "05/04/2021"
+output:
+  pdf_document: default
+  html_document:
+    fig_width: 5
+    fig_height: 4
+    fig_align: center
+    fig_caption: yes
+    highlight: textmate
+    theme: cosmo
+---
+<style type="text/css">
+  body{
+  font-size: 14pt;
+  text-align: justify;
+}
+</style>
+
+![  ](uadb.jpg)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+\newpage
+
+## **Contexte**
+Vous êtes propriétaire du centre commercial et vous voulez comprendre les clients comme ceux qui peuvent facilement converger [Clients cibles] afin que le sens puisse être donné à l'équipe marketing et planifier la stratégie en conséquence.
+Cet ensemble de données est créé uniquement à des fins d'apprentissage des concepts de segmentation de la clientèle, également appelés analyse du panier de marché.
+
+## **Objectifs**
+À la fin de cette étude de cas, nous serons en mesure de répondre aux questions suivantes.
+
+1. Comment réaliser la segmentation des clients à l'aide de l'algorithme d'apprentissage automatique (**hierarchical clustering, KMeans Clustering, Hierarchical Clustering on Principal Components **) en R de la manière la plus simple.
+2. Quels sont vos clients cibles avec lesquels on peut démarrer une stratégie marketing [facile à converser].
+
+## **Décrire les données**
+La base de donnée que nous allons étudier contient les informations suivantes (ID, âge, sexe, revenu, score de dépenses) sur les clients
+
+* **CustomerID** : ID unique attribué au client
+* **Gender** : Sexe du client
+* **Age** : Âge du client
+* **Annual_Income** : Revenu annuel du client
+* **Score** : Note attribuée par le centre commercial en fonction du comportement des clients et de la nature des achats.
+```{r}
+#Choisir un répertoire de travail
+setwd("C:/Users/IbouKah/Desktop/MethodeClassification/ProjetClustering/")
+#Importation de la base
+data0=read.csv("Mall_Customers.csv",header=TRUE,row.names="CustomerID")
+```
+Pour mieux organiser notre travail, nous avons créer un dossier dédié à ce projet avec la fonction **setwd**,qui permet de se placer sur ce dossier. Pour importer la base on utilise la fonction **read.csv**.L'argument **row.names** met la colonne **"CustomerID"** comme index de notre DataFrame.
+#### **Dimensions et Types**
+```{r}
+str(data0)
+```
+Notre jeux de donnée est composée de 200 lignes et 4 variables. La variable **Gender** est qualitative et les autres variables(Age, Annual_Income, Score) sont quantitatives .
+#### **Affichage des cinq premières lignes**
+```{r,fig.align='center'}
+head(data0,5)
+```
+\newpage
+
+# **1. Analyse descriptive des variables téléchargées**
+#### **Vue résumée des variables**
+```{r}
+summary(data0)
+```
+Cette fonction **summary** affiche les statistiques des variables. On constate que l'Âge des clients varie entre 18 et 70,le revenu annuel est entre 15000\$ et 137000\$ et le score varie entre 1 et 99.
+
+#### Liaison et Densité
+```{r message=FALSE, warning=FALSE,fig.width = 10,fig.height=6,fig.align='center'}
+library("GGally")
+options(repr.plot.width=12, repr.plot.height=8)
+ggpairs(data0,aes(color=Gender))+theme_bw(base_size = 16)
+```
+
+Suivant la diagonale on constate que la distribution en genre est un peu équilibré entre les clients **Male** et **Female**.
+Lorsque les variables étudiées sont de type numérique on a tendance à utiliser une courbe de densité pour visualiser la distribution de chacune des variables.  
+Vu les courbes de densité ci-dessus toutes variables sont bien distribuées. 
+On note qu'il n'a pas de grande différence entre les boxplots vert et rouge. Cela signifie que la variable Gender n'a pas d'influence sur les variables quantitatives.
+
+\newpage
+
+# **2. Pre-processing**
+#### **Gestion des valeurs manquantes**
+
+```{r,fig.align='center'}
+sapply(data0,function(x) sum(is.na(x)))
+```
+
+Le bout de code ci-dessus calcule la somme des valeurs manquantes de chaque variable. Après la sortie on constate qu'il n'y a pas de valeurs manquantes dans notre jeux de donnée.
+
+#### **Gestion des valeurs extremes**
+
+D'après les courbes de densité ci-avant,les variables ont une bonne distribution et cela nous amène à conclure qu'il n'y a pas de valeurs aberrantes dans la base.
+
+#### **Encodage de la variable Gender**
+
+```{r}
+unique(data0$Gender)
+```
+La variable **Gender** a deux modalités, pour faciliter les calcules à la machine nous encodons cette variable comme suit : **"Male" = 1** et **"Female" = 2**.
+```{r}
+data0["Gender"]= sapply(data0$Gender, function(x){
+  if(x=="Male"){
+    return(1);
+  }else {
+    return(2);
+  }
+})
+```
+
+\newpage
+
+## **3. Analyse multivariées ACP**
+
+Nous avons choisi de faire une ACP, car toutes les variables de la base sont maintenant quantitatives. La vaiable **Gender** a été encodé en numérique.
+
+### **3.1 Typologie des Individus**
+
+#### **3.1(1 et 5) Analyser la matrice de distance entre les individus . Quelles sont les individus qui se ressemblent le plus ?**
+
+Notre jeux de donnée est composé de plusieurs lignes, ils s'avère difficile d'analyser la matrice de distance entre les individus.
+C'est pour cela qu'on a opté de visualiser l'ACP des individus pour mieux disserner les ressemblances.
+
+```{r}
+# Importation des librairies pour faire l'ACP
+library(FactoMineR)
+library(factoextra)
+```
+
+```{r}
+# Instancier un objet PCA
+res.pca=  PCA(data0,  graph = FALSE)
+```
+
+```{r,fig.align='center'}
+titre="Répartition des valeurs propres"
+fviz_eig(res.pca,addlabels = T,title=titre)
+```
+
+L’inertie des axes factoriels indique d’une part si les variables sont structurées et suggère d’autre part le nombre judicieux de composantes principales à étudier. Les 2 premiers axes de l’ analyse expriment 59.92% de l’inertie totale du jeu de données ; cela signifie que 59.92% de la variabilité totale du nuage des individus (ou des variables) est représentée dans ce plan. C’est un pourcentage assez important, et le premier plan représente donc convenablement la variabilité contenue dans une grande part du jeu de données actif. Cette valeur est supérieure à la valeur référence de **57.71%*.
+
+```{r,fig.align='center'}
+titre1="ACP des individus en fonction des cos2"
+fviz_pca_ind(res.pca, axes = c(1,2), title = titre1, col.ind = "cos2"
+             , gradient.cols=c("black", "blue", "red"),
+             ggtheme = theme_minimal())
+```
+
+D'après le graphe ci-dessus on note une dispersion de part et d'autre des individus. Les individus les plus représentés sont ceux éloignés du centre.Néanmois on peut classer les individus en quatres groupes suivant les demi plans factoriels à gauche et à droite.  
+Puisque les ID  et Annual_Income sont d'ordre croissante dans la base et d'aprés le graghe ci-dessus les ID sont croissant suivant l'axe 2 alors on peut conclure que **le revenu annuel explique positivement l'axe 2**.
+
+### **3.1.2 Etudier si les ressemblances ou les dissemblances des individus correspondent à des explications concernant la problematique**
+
+Les ressemblances ou les dissemblances des individus correspondent très bien à des explications concernant la problematique car notre objectif est de classer les clients selon leurs caractériques.
+
+### **3.1.3 Estimer l’impact de chaque individus et interpreter**
+
+```{r,fig.align='center'}
+titre1="ACP des individus fonction des contributions"
+fviz_pca_ind(res.pca, axes = c(1,2), title = titre1, col.ind = "contrib"
+             , gradient.cols=c("black", "blue", "red"),
+             ggtheme = theme_minimal())
+```
+
+On constate que les points qui sont proche du centre ont contribué peu à la construction du premier plan. Les autres points éloignés du centre ont une forte contribution et sont proches de parts et d'autres des bissectrices du plan.
+
+### **3.1.4 Proposer une typologie des individus.**
+```{r,fig.align='center'}
+echantillonnage=data0[c(198,200,186,8,30,10,13,25,23,193,199,183),]
+echantillonnage
+```
+Pour proposer une typologie des individus, nous avons pris quelques individus bien représentés dans chaque groupe afin d'étudier leurs caractéristiques.  
+**Groupe 1: Demi plan droite en haut (exemple 198,200,186)** caracterisé par :
+
+* de fortes valeurs pour les variables Annual_Income et Score
+
+**Groupe 2: Demi plan droite en bas (exemple 8,30,10)** caracterisé par :
+
+* de fortes valeurs pour la variable  Score
+* de faibles valeurs pour la variable Annual_Income
+
+**Groupe 3: Demi plan gauche en bas (exemple 13,25,23)** caracterisé par :
+
+* de fortes valeurs pour la variable Age
+* de faibles valeurs pour les variables Annual_Income et Score
+
+**Groupe 4: Demi plan gauche en haut (exemple 193,199,183)** caracterisé par :
+
+* de fortes valeurs pour la variable Annual_Income
+* de faibles valeurs pour la variable Score
+
+### **3.1.6 Faites une interprétation globale de vos résultats sur les individus.**
+
+Pour résumer, l'ACP sur individus nous a permis de classer les clients en **quatres groupes** qui sont bien définis dans la question précédante.Ces groupes ont été construit sur la base d'échatillonnage des individus les plus représentatifs.Ce pendant, l'ACP sur les variables  que nous allons faire dans la partie qui suit nous permettra de confirmer ou d'infirmer nos hypothèses.
+
+\newpage
+
+## **3.2 Typologie des Variables**
+
+### **3.2.1 Analyser la matrice de corrélation entre les individus . Quelles sont les variables les plus proches ?**
+#### **Corrélogramme**
+
+```{r,fig.align='center'}
+library(corrplot)
+X=cor(data0)
+corrplot(X,type = "upper",tl.col = "black",tl.srt = 55)
+```
+
+D'après le Corrélogramme ci-dessus, on note une faible corrélation entre les variables. Néanmoins les variables Age et Score sont un peu proche avec une corrélation de -0.32722685.
+
+### **3.2.2 Etudier si les corrélations des variables correspondent à des explications concernant la problematique**
+```{r,fig.align='center'}
+titre2="ACP des variables en fonction de cos2"
+fviz_pca_var(res.pca, axes = c(1,2), title = titre2, col.var = "cos2"
+             , gradient.cols=c("black", "blue", "red"),
+             ggtheme = theme_minimal())
+```
+
+Les variables Age, Annual_Income et Score sont bien représentées sur le premier plan de plus l'Age et le Score s'opposent sur ce plan. Donc ce qui confirme les hypothéses du Groupe 3 (**de fortes valeurs pour la variable Age et de faibles valeurs pour la variable Score **).
+Alors les corrélations des variables Age et Score correspondent biens à des explications concernant la problematique.
+
+### **3.2.3 Estimer l’impact de chaque variable et interpreter**
+```{r,fig.align='center'}
+titre2=" Graphe de l'ACP des variables en fonction des contributions"
+fviz_pca_var(res.pca, axes = c(1,2), title = titre2, col.var = "contrib"
+             , gradient.cols=c("black", "blue", "red"),
+             ggtheme = theme_minimal())
+```
+
+Les variables Age, Annual_Income et Score contribuent très bien à la construction de ce plan. Donc ces variables ont un impact sur la distribution des individus dans le premier plan factoriel.
+
+#### **3.2.5 Proposer une typologie des variables**
+
+D'après le graphe de l'ACP des variables, on a classé les variables en trois groupes comme suit :
+
+* d'une part la variable Annual_Income
+* d'autre part la variable Gender
+* et le troixième groupe représenté par les variables qui s'opposent (Age et Score).
+
+#### **3.2.6. Faites une interprétation globale de vos résultats sur les variables.**
+
+Comme les variables Age, Annual_Income et Score contribuent très bien à la construction du premier plan et sont bien représentées alors on peut les utiliser pour expliquer les dimensions 1 et 2.  D'après le graphe on constate que :
+
+* **Annual_Income** explique la dimesion 2
+* **Age et Score** expliquent la dimension 1.
+
+## **Faites une interprétation globale de nos données**
+
+```{r,fig.align='center'}
+titre3=" Graphe de l'ACP Individus variables en fonction de cos2"
+fviz_pca_biplot(res.pca,title=titre3, repel = TRUE,label = "none",
+                col.var = "cos2",
+                col.ind = "cos2",
+                , gradient.cols=c(1,2,4),
+                ggtheme = theme_minimal()
+                )
+```
+
+La superposition des deux graphes et la question 3.2.6) confirment les hypothèses qu'on avait posé à la partie 3.1.4) sur la typologie des individus, on peut affirmer que les individus sont classés en 4 groupes comme suit  :  
+**Groupe 1: Demi plan droite en haut** caracterisé par :
+
+* de fortes valeurs pour les variables Annual_Income et Score
+
+**Groupe 2: Demi plan droite en bas** caracterisé par :
+
+* de fortes valeurs pour la variable  Score
+* de faible valeurs pour la variable Annual_Income
+
+**Groupe 3: Demi plan gauche en bas** caracterisé par :
+
+* de fortes valeurs pour la variable Age
+* de faibles valeurs pour les variables Annual_Income et Score
+
+**Groupe 4: Demi plan gauche en haut** caracterisé par :
+
+* de fortes valeurs pour la variable Annual_Income
+* de faibles valeurs pour la variable Score
+
+\newpage
+
+# **4. Méthode  de Classification Ascendant Hiérarchique**
+La classification hiérarchique (ou hierarchical clustering en anglais) est l’une des approches les plus importantes pour l’exploration des données multivariées. L’objectif est d’identifier des groupes (i.e., clusters) d’objets similaires dans un jeu de données.  
+La classification ascendante hiérarchique (CAH), utilisée pour identifier des groupes d’observations similaires dans un jeu de données.
+
+**Les étapes de cette méthode sont :**
+
+1. une matrice de distance (similarité) est calculée.
+2. les échantillons individuels (officiellement considérés comme des clusters) seront fusionnés sur la base de la distance entre les échantillons les plus dissemblables.
+3. la matrice est mise à jour
+4. les étapes sont répétées jusqu'à ce qu'il ne reste qu'une seule grappe avec toutes les observations.
+```{r}
+# Importation des librairies
+library("NbClust")
+library("dbscan")
+library("fpc")
+library ("cluster") # for general clustering algorithms
+```
+
+#### **Arbre de classification**
+```{r,fig.align='center'}
+data=scale(data0)  # c
+hm<-hclust(dist(data)) # Euclidian distance and complete linkage as default
+options(repr.plot.width=15, repr.plot.height=6)
+plot(hm) ## Tracer Le dendogramme
+```
+
+#### **Pour quatres cluster**
+
+```{r,fig.align='center'}
+fviz_cluster(eclust(data,FUNcluster="hclust", k=4, hc_metric="euclidean", hc_method="complete"), dfs, geom = "point")
+```
+\newpage
+
+# **5. Méthode de k-means**
+Les étapes de cette méthode sont :
+
+1. les centres initiaux des clusters (centroïdes) sont choisis au hasard.
+2. les observations sont assignées au centroïde le plus proche, basé sur une certaine mesure de distance
+3. les centroïdes sont recalculés avec les moyennes des observations qui font partie de chaque cluster.  
+4. Les étapes 2 et 3 sont répétées, dans le but de minimiser la variation totale au sein du cluster, jusqu'à ce qu'il n'y ait plus de changement ou qu'une certaine tolérance soit atteinte.  
+Avec K-means, **nous devons spécifier à l'avance le nombre de clusters**. Ici, nous allons utiliser la méthode du coude, c'est-à-dire que nous allons essayer quelques nombres de clusters (n) et observer la variation intra-clusters liée à chaque n. Lorsque la somme d'un cluster ne signifie pas une réduction considérable de la variation intra-clusters, nous avons un bon choix possible de n (coude sur le graphique).
+
+```{r,fig.align='center'}
+wss<-0
+for (n in 1:10){
+    km<-kmeans(data, centers=n, nstart=10, iter.max=50) #starts with random centroids 10 times
+    wss[n]<-km$tot.withinss
+}
+options(repr.plot.width=5, repr.plot.height=5)
+plot(wss, type="b", xlab="Number of clusters (n)", ylab="Sum of squares within groups")
+```
+
+```{r}
+fviz_silhouette(eclust(data, FUNcluster="kmeans", k=5, hc_metric="euclidean"))
+```
+ 
+\newpage
+
+# **Méthode de Classification Hiérarchique sur Composantes Principales**
+
+L’approche HCPC (Hierarchical Clustering on Principal Components ou Classification Hiérarchique sur Composantes Principales) nous permet de combiner les trois méthodes standards utilisées dans les analyses de données multivariées (Husson, Josse, and J. 2010):
+
+1- Les Méthodes des composantes principales (ACP, AFC, ACM, AFDM, AFM),  
+2- La classification ascendante hiérarchique et  
+3- Le partitionnement en k-means.
+
+**Algorithme de la méthode HCPC**
+
+* Effectuez une ACP, AFC, ACM, AFDM ou AFM en fonction du type de données. Choisissez le nombre de dimensions à retenir en spécifiant l’argument ncp. La valeur par défaut est 5.
+* Appliquez la classification hiérarchique sur le résultat de l’étape 1.
+* Choisissez le nombre de groupes en fonction du dendrogramme obtenu à l’étape 2. Un partitionnement initial est effectué.
+* Effectuez le k-means pour améliorer le partitionnement initiale obtenu à l’étape 3.
+
+**1. Faire une ACP**
+**2. Appliquer la classification hiérarchique sur le résultat de l’ACP**
+ 
+```{r,fig.align='center'}
+# 1. ACP 
+res.pca <- PCA(data0, ncp = 4, graph = FALSE)
+# 2. HCPC
+res.hcpc <- HCPC(res.pca, graph = FALSE)
+```
+
+**3. Visualiser le dendrogramme généré par la classification. Fonction R: fviz_dend() [factoextra]:**
+```{r,fig.align='center'}
+fviz_dend(res.hcpc, 
+          cex = 0.7,                     # Taille du text
+          palette = "jco",               # Palette de couleur ?ggpubr::ggpar
+          rect = TRUE, rect_fill = TRUE, # Rectangle autour des groupes
+          rect_border = "jco",           # Couleur du rectangle
+          labels_track_height = 0.8      # Augment l'espace pour le texte
+          )
+```
+
+**4. Visualiser les individus et colorer par groupes. Fonction R: fviz_cluster() [factoextra].**
+
+```{r,fig.align='center'}
+fviz_cluster(res.hcpc,
+             repel = TRUE,            # Evite le chevauchement des textes
+             show.clust.cent = TRUE, # Montre le centre des clusters
+             palette = "jco",         # Palette de couleurs, voir ?ggpubr::ggpar
+             ggtheme = theme_minimal(),
+             main = "Factor map"
+             )
+```
+
+**5. Contenu du résultat de la fonction HCPC():**
+
+* **data.clust:** Données d’origine avec une colonne supplémentaire appelée clust contenant les groupes.  
+* **desc.var:** les variables décrivant les groupes  
+* **desc.ind:** les individus les plus typiques de chaque groupes  
+* **desc.axes:** les axes décrivant les groupes
+
+```{r}
+res.hcpc$desc.var$quanti
+```
+
+### Interprétation :
+
+**Cluster 1**
+Les variables Annual_Income et Score sont significatives.La valeur moyenne de la variable Annual_Income est de 88.50000, ce qui est suppérieur à la moyenne globale (60.56) dans tous les clusters et la valeur moyenne de la variable Score est de 16.76471, ce qui est inférier à la moyenne globale (50.20) dans tous les clusters.  
+
+Par conséquent on peut conclure que le **cluster 1** partage les mêmes caractéristiques que le **Groupe 4**  
+Par analoguie  
+Le **cluster 2** a les mêmes caractéristiques que le **Groupe 3**  
+Le **cluster 3** a les mêmes caractéristiques que le **Groupe 2**
+Le **cluster 4** a les mêmes caractéristiques que le **Groupe 1**
+
+# **Conclusion**
+
+Au cours de cette étude nous avons réaliser la segmentation des clients grace aux algorithmes d’apprentissage automatique
+hierarchical clustering, KMeans Clustering et Hierarchical Clustering on Principal Compo-
+nents. Dans tous ces algorithmes d'apprentissage on a obtenu le même resultat(**quatres groupes distincts**).
+Pour démarrer une stratégie marketing on cible le groupe de clients avec une forte Score. Parmi ces quatres groupes seul le groupe 2 répond à cette attente.
+
+\newpage
+
+# Questions de cours  
+
+1. Comment mesure-t-on la ressemblance entre les individus ?
+
+on mesure la ressemblance entre les individus en fonction des distances ou similarités
+
+2. Le nuage est toujours centré. Pourquoi ? Quel est l’effet du centrage sur l’analyse du nuage
+des individus ? Quel type de liaisons évalue-t-on dans le nuage des variables ?  
+
+* le nuage est toujours centré et normé pour uniformiser les individus suivant chaque variable.  
+
+* Le centrage sur l'analyse du nuage des individus entraine que l'origine des axes est confondue avec le centre de gravité G de la population.  
+
+* Dans le nuage des variables, on évalue les corrélations, grace au coefficient de corrélation linéaire.
